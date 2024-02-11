@@ -4,9 +4,9 @@ help: ## Prints available commands
 dev: down ## Run in development mode
 	docker-compose -f docker-compose.dev.yml up
 
-down:  ## Removes containers
+down:  ## Remove containers
 	docker-compose down --remove-orphans -v
 
-destroy: ## Removes containers, images and volumes
+destroy: ## Remove containers, images and volumes
 	docker-compose down --rmi all -v --remove-orphans 
 

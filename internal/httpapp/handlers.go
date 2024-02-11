@@ -75,7 +75,7 @@ func HandleGetExtract(w http.ResponseWriter, r *http.Request){
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		log.Printf("Error creating transaction: %v", err)
+		log.Printf("Error getting the extract: %v", err)
 		return
 	}
 
