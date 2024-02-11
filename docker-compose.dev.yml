@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  rinha-backend-2024-q1-api-dev:
+    build: 
+        context: .
+        dockerfile: Dockerfile.dev
+    volumes:
+      - .:/usr/local/app
+    ports:
+      - 8000:8000
+    environment:
+      - DB_NAME=rinha-backend
+      - DB_PORT=5432
+      - DB_USER=root
+      - DB_PASSWORD=admin
+      - DB_HOST=db
+      - WEB_PORT=8000
+    depends_on: 
+      - db
+    command: air -c air.toml
+  db:
+    image: postgres:alpine
+    ports: 
+      - 5432:5432
+    volumes:
+      - postgres-db:/var/lib/postresql/data
+      - ./.docker/postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=rinha-backend
+
+volumes:
+  postgres-db:
