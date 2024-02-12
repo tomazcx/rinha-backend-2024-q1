@@ -26,5 +26,5 @@ func main(){
 	defer db.Close()
 
 	log.Println("Server started at port " + cfg.WebPort)
-	http.ListenAndServe(":8000", mux)
+	http.ListenAndServe(":" + cfg.WebPort, mux)
 }

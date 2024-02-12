@@ -9,6 +9,7 @@ import (
 )
 
 var ErrInvalidValue = errors.New("Invalid value")
+var ErrClientNotFound = errors.New("Client not found")
 
 type ClientRepository struct {
 	db *sql.DB
@@ -33,22 +34,26 @@ type ClientExtract struct {
 }
 
 func (r *ClientRepository) GetExtract(id int) (*ClientExtract, error) {
-	rows, err := r.db.Query("SELECT c.saldo, NOW() as data_extrato, C.limite, T.valor, T.tipo, T.descricao, T.realizada_em FROM cliente C LEFT JOIN transacao T ON T.id_cliente = C.id WHERE C.id = $1;", id)
+	rows, err := r.db.Query("SELECT c.saldo, NOW() as data_extrato, C.limite, T.valor, T.tipo, T.descricao, T.realizada_em FROM cliente C LEFT JOIN transacao T ON T.id_cliente = C.id WHERE C.id = $1 ORDER BY T.realizada_em DESC LIMIT 10;", id)
 
 	if err != nil {
 		return nil, err
 	}
-
+	defer rows.Close()
 	var result ClientExtract
 	result.UltimasTransacoes = make([]Transaction, 0)
-
+	found := false;
 	for rows.Next() {
 		var transaction Transaction
+		found = true
 		if err := rows.Scan(&result.Saldo.Total, &result.Saldo.DataExtrato, &result.Saldo.Limite, &transaction.Valor, &transaction.Tipo, &transaction.Descricao, &transaction.RealizadaEm); err != nil {
 			break
 		}
-
 		result.UltimasTransacoes = append(result.UltimasTransacoes, transaction)
+	}
+
+	if !found {
+		return nil, ErrClientNotFound
 	}
 
 	return &result, nil
@@ -66,16 +71,21 @@ type ClientData struct {
 }
 
 func (r *ClientRepository) CreateTransaction(clientId int, transaction CreateTransactionDTO) (*ClientData, error) {
-	tx, err := r.db.BeginTx(context.Background(), nil)	
+	tx, err := r.db.BeginTx(context.Background(), nil)
 
 	if err != nil {
 		return nil, err
 	}
 
-	var clientBudget, clientLimit int 
+	var clientBudget, clientLimit int
 	err = tx.QueryRow("SELECT saldo, limite FROM cliente WHERE id = $1 FOR UPDATE", clientId).Scan(&clientBudget, &clientLimit)
 
 	if err != nil {
+		if err == sql.ErrNoRows {
+			_ = tx.Rollback()
+			return nil, ErrClientNotFound
+		}
+
 		return nil, tx.Rollback()
 	}
 

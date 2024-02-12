@@ -22,17 +22,17 @@ func HandleCreateTransaction(w http.ResponseWriter, r *http.Request) {
 	var body db.CreateTransactionDTO 
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
 	if len(body.Descricao) > 10 || len(body.Descricao) < 1 { 
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
 	if body.Tipo != "c" && body.Tipo != "d" {		
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -44,15 +44,15 @@ func HandleCreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if clientId < 1 || clientId > 5 {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
 	repo := db.NewClientRepository()
 	clientData, err := repo.CreateTransaction(clientId, body)
 
 	if err != nil {
+		if errors.Is(err, db.ErrClientNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
 		if errors.Is(err, db.ErrInvalidValue) {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
@@ -76,15 +76,15 @@ func HandleGetExtract(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	if clientId < 1 || clientId > 5 {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
 	repo := db.NewClientRepository()
 	extract, err := repo.GetExtract(clientId)
 
 	if err != nil {
+		if errors.Is(err, db.ErrClientNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("Error getting the extract: %v", err)
 		return

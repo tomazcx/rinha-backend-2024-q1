@@ -1,23 +1,68 @@
 version: "3.8"
 
 services:
-  api1: &api
+  rinha-backend-2024-q1-api1: &api
     build: .
+    network_mode: host
     restart: always
-    depends_on:
-     - db
+    environment:
+      - DB_NAME=rinha-backend
+      - DB_PORT=5432
+      - DB_USER=root
+      - DB_PASSWORD=admin
+      - DB_HOST=localhost
+      - WEB_PORT=8000
+    depends_on: 
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: '100MB'
+  rinha-backend-2024-q1-api2:
+    <<: *api
+    environment:
+      - WEB_PORT=8001
+      - DB_HOST=localhost
   db:
     image: postgres:alpine
-    ports:
-      - 5432:5432
+    network_mode: host
     volumes:
       - postgres-db:/var/lib/postgresql/data
-      - ./.docker/postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./.docker/postgres/:/docker-entrypoint-initdb.d/
     environment:
       - POSTGRES_USER=root
       - POSTGRES_PASSWORD=admin
       - POSTGRES_DB=rinha-backend
-
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: '250MB'
+    command: [
+      "postgres",
+      "-c",
+      "config_file=/docker-entrypoint-initdb.d/postgresql.conf" 
+     ]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  nginx: 
+    image: nginx:latest
+    network_mode: host
+    volumes:
+      - ./.docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - rinha-backend-2024-q1-api1
+      - rinha-backend-2024-q1-api2
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: '100MB'
 
 volumes:
   postgres-db:
