@@ -2,6 +2,7 @@ package httpapp
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -21,6 +22,11 @@ func HandleCreateTransaction(w http.ResponseWriter, r *http.Request) {
 	var body db.CreateTransactionDTO 
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if len(body.Descricao) > 10 || len(body.Descricao) < 1 { 
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -47,6 +53,11 @@ func HandleCreateTransaction(w http.ResponseWriter, r *http.Request) {
 	clientData, err := repo.CreateTransaction(clientId, body)
 
 	if err != nil {
+		if errors.Is(err, db.ErrInvalidValue) {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			return
+		}
+
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("Error creating transaction: %v", err)
 		return

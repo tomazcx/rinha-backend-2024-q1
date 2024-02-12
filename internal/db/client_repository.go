@@ -3,9 +3,12 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/tomazcx/rinha-backend-2024-q1/config"
 )
+
+var ErrInvalidValue = errors.New("Invalid value")
 
 type ClientRepository struct {
 	db *sql.DB
@@ -38,7 +41,6 @@ func (r *ClientRepository) GetExtract(id int) (*ClientExtract, error) {
 
 	var result ClientExtract
 	result.UltimasTransacoes = make([]Transaction, 0)
-	rows.Scan(&result.Saldo.Total, &result.Saldo.DataExtrato, &result.Saldo.Limite)
 
 	for rows.Next() {
 		var transaction Transaction
@@ -64,10 +66,22 @@ type ClientData struct {
 }
 
 func (r *ClientRepository) CreateTransaction(clientId int, transaction CreateTransactionDTO) (*ClientData, error) {
-	tx, err := r.db.BeginTx(context.Background(), nil)
+	tx, err := r.db.BeginTx(context.Background(), nil)	
 
 	if err != nil {
 		return nil, err
+	}
+
+	var clientBudget, clientLimit int 
+	err = tx.QueryRow("SELECT saldo, limite FROM cliente WHERE id = $1 FOR UPDATE", clientId).Scan(&clientBudget, &clientLimit)
+
+	if err != nil {
+		return nil, tx.Rollback()
+	}
+
+	if (clientLimit < -(clientBudget - transaction.Valor)) && transaction.Tipo == "d" {
+		_ = tx.Rollback()
+		return nil, ErrInvalidValue
 	}
 
 	_, err = tx.Exec("INSERT INTO transacao (valor, tipo, descricao, id_cliente) VALUES ($1, $2, $3, $4)", transaction.Valor, transaction.Tipo, transaction.Descricao, clientId)
@@ -76,8 +90,15 @@ func (r *ClientRepository) CreateTransaction(clientId int, transaction CreateTra
 		return nil, tx.Rollback()
 	}
 
+	var amount int
+	if transaction.Tipo == "d" {
+		amount = -transaction.Valor
+	} else {
+		amount = transaction.Valor
+	}
+
 	var result ClientData
-	row := tx.QueryRow("UPDATE cliente SET saldo = saldo - $1 WHERE id = $2 RETURNING saldo, limite", transaction.Valor, clientId)
+	row := tx.QueryRow("UPDATE cliente SET saldo = saldo + $1 WHERE id = $2 RETURNING saldo, limite", amount, clientId)
 	err = row.Scan(&result.Saldo, &result.Limite)
 
 	if err != nil {
